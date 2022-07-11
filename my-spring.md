@@ -2,7 +2,7 @@
 
 >Spring的目的在于使JAVA EE开发更加容易，个人认为其核心在于IOC以及AOP。IOC是一种理念，将对象的创建权交给Spring，而AOP是一个模块，实现面向切面编程，比较接近一种动态增强。个人将着重IOC、AOP的相关功能进行实现。
 
-## Spring FrameWork组件
+## FrameWork
 
 >其实组件不止下述这些，没用到的没有提及。想快速了解可以看看[Spring FrameWork 5](https://pdai.tech/md/spring/spring-x-framework-introduce.html)专栏，鱼皮大大写的。想深入了解的话推荐看陈雄华老师在电子工业出版社出版的Spring有关书籍，讲的很细，日后希望可以详读。
 
@@ -100,7 +100,7 @@ public class ServiceImpl {
 
 #### ApplicationContext
 
->不多介绍了，总之处理特殊Bean和定义基础Bean容器都是由它衍生出来的，内含Bean工厂、应用事件、资源加载、国际化相关接口，并有众多的实现类！
+>继承自BeanFactory，实现处理特殊Bean和定义基础Bean容器等功能，内含Bean工厂、应用事件、资源加载、国际化相关接口，有众多的扩展实现
 
 #### 总结
 
@@ -110,40 +110,102 @@ public class ServiceImpl {
 
 ### 初始化流程
 
->Spring实现将资源配置通过加载、解析、生成BeanDefinition注册到IoC容器的过程
+>Spring实现将资源配置通过加载、解析、生成BeanDefinition注册到IoC容器（**本质上是存放BeanDefinition的ConcurrentHashMap<String,Object>**）的过程
 
-简单来说，总的流程是：
+**从源码上看，具体实现为**
 
 1. 调用父类构造方法为容器设置好Bean资源加载器：
 
    1. 调用默认构造函数初始化容器id，name，状态以及资源解析器
    2. 调用setParent方法将父容器的Environment合并到当前容器
-
 2. 设置配置路径进行Bean定义资源文件定位
 
    1. 调用setConfigLocations方法从Environment中解析Bean配置文件路径
-
 3. 初始化容器，调用模板方法refresh（该模板提供钩子方法）
 
    1. 创建IoC容器前，如果有容器存在，需要将已有容器销毁和关闭
    2. 建立新的Ioc容器
 
-   作用相当于对IoC容器进行重启
+**从流程上看：**
+
+![spring-framework-ioc-source-9](C:\Users\yato\Desktop\U know wt\面试准备\dailyNote\笔记.assets\spring-framework-ioc-source-9.png)
+
+1. 调用refresh方法进入初始化入口
+2. 调用loadBeanDefinition方法载入beanDefinition
+	1. 通过ResourceLoader实现资源文件位置定位
+	2. 通过BeanDefinitionReader完成定义信息的解析和Bean信息的注册
+	3. 实现BeanDefinitionRegistry接口将BeanDefinition注册到IoC容器中
+3. 通过BeanFactory和ApplicationContext使用Spring的IoC服务
 
 >这里补充一下关于模板方法模式的一些知识
 >
->模板方法是一个算法骨架，是一系列调用的基本方法，而基本方法可以分为：
+>**模板方法是一个算法骨架，是一系列调用的基本方法，而基本方法可以分为：**
 >
 >1. 抽象方法：声明但未实现
 >2. 具体方法：实现，可以重写或继承
 >3. 钩子方法：实现，分为用于判断的逻辑方法，和需要子类重写的空方法两种
 >
->在IoC容器初始化过程中用到的钩子方法有
+>**在IoC容器初始化过程中用到的钩子方法有**
 >
 >1. prepareRefresh：对应BeanFactory、MessageSource、ApplicationEvent的初始化
->2. onRefresh：初始化完成后注册监听器
->3. finishRefresh：完成重新初始化
->4. cancelRefresh：销毁已初始化（这个方法是前序方法出错调用的
+>2. onRefresh：注册监听器
+>3. finishRefresh：ioc容器初始化完成
+>4. cancelRefresh：销毁已初始化的ioc容器（这个方法是前序方法出错调用的
 
-### Bean实例化	
+### Bean实例化
 
+#### getBean(String name)
+
+>具体流程体现在**getBean**方法，注意的是Spring进行Bean实例化时：会确保依赖也被初始化。根据beanDefinition的信息（单例、原型、bean的scope）有三种不同的创建bean实例方法。
+
+**大概的流程是**：
+
+1. 从beanDefinitionMap通过beanName获得BeanDefinition
+2. 从BeanDefinition中获得beanClassName
+3. 通过反射初始化beanClassName的实例instance
+	1. 构造函数从BeanDefinition的getConstructorArgumentValues()方法获取
+	2. 属性值从BeanDefinition的getPropertyValues()方法获取
+4. 返回beanName的实例instance
+
+>上面提到了依赖，这个依赖我们不难想象。也许beanA和beanB存在这样的关系，beanA中有属性beanB，而beanB中也有属性beanA。正常程序中是完全不会有影响的，因为并不会强制要求属性与对象同时进行初始化。但是上文步骤4中提到，Spring源码中会要求依赖也被确保初始化！wow，here is the problem，come to solve it！
+
+#### 三级缓存
+
+>三级缓存是Spring为解决单例bean的循环问题而使用的一种策略。具体而言体现在调用**getSingleton**方法，会查找bean是否在缓存中，在哪一级，以及进行相对应的处理
+
+**哪三层？**
+
+1. 一级缓存（singletonObjects）：单例对象缓存池的成熟对象，已经实例化并且属性赋值
+2. 二级缓存（earlySingletonObjects）：单例对象缓存池的半成品对象，已经实例化但属性尚未赋值
+3. 三级缓存（singletonFactories）：单例工厂的缓存
+
+**方法执行过程？**
+
+1. 先从一级缓存singletonObjects中获取
+2. 若是获取不到，而且对象正在建立中，再从二级换从earlySingletonObjects中获取
+3. 若是仍然获取不到且容许singletonFactories经过get
+
+**如何解决问题？**
+
+关键在于第三层缓存！Spring在调用createBeanInstance后，即使对象没有进行完全的初始化（根据对象引用已经可以定位到堆中的对象了，但是对象内部的一些属性还没有填充（不知道这个词恰不恰当，暂时这么说）），也会经过ObjectFactory将对象存入三级缓存中。如果存在循环依赖，当对象B在三级缓存中读到该对象（**需要Spring允许调用getObject方法**），对象B就可以进行初始化。当对象B创建完毕后，将本身放到一级缓存中，A对象就可以接着初始化
+
+**解决不了哪些问题？**
+
+1. 构造器的循环依赖：调用构造方法之前无法将对象放入三级缓存中，策略失效
+2. protype作用域循环依赖：Spring不缓存protype作用域bean，策略失效
+3. 多例的循环依赖：多实例bean每调用一次getBean都会执行一次构造方法，没有三级缓存
+
+>这里提一下上述对象怎么解决：
+>
+>1. 生成代理对象产生的循环依赖可以采用延迟加载，或指定加载先后顺序解决
+>2. 使用@DependsOn产生的循环依赖，需要找到对应地方迫使其不再循环依赖
+>3. 多例产生循环依赖：将bean改为单例
+>4. 构造器循环依赖：采用延迟加载解决
+
+### Bean生命周期
+
+>从逻辑上分，可以分为实例化、属性赋值、初始化、销毁几个部分
+>
+>从方法调用而言，涉及到BeanPostProcessor（容器级生命周期接口方法）、Bean自身的方法、Aware接口相关方法（Bean级生命周期接口方法），Spring通过独立于Bean的接口实现类可以实现对Bean生命周期做动态增强的功能
+
+![preview](https://segmentfault.com/img/remote/1460000040365152/view)
