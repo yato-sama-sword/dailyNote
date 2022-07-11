@@ -63,7 +63,7 @@ public class ServiceImpl {
 
 >总体来说功能如下图所示嘞：
 
-![IOC功能](\笔记.assets\spring-framework-ioc-source-7.png)
+![IOC功能](笔记.assets\spring-framework-ioc-source-7.png)
 
 1. 加载Bean配置：对不同类型资源的加载（比如xml配置文件），解析成生成统一Bean的配置（Bean容器，对Bean进行定义和行为管理）
 2. 根据Bean定义加载生成Bean实例，并放置在Bean容器中：比如Bean依赖注入、Bean嵌套、Bean缓存
@@ -106,10 +106,44 @@ public class ServiceImpl {
 
 > 分析完之后，鱼皮大大的架构图可以对应相关模块如下
 
-![spring-framework-ioc-source-71](C:\Users\yato\Desktop\U know wt\面试准备\dailyNote\笔记.assets\spring-framework-ioc-source-71.png)
+![spring-framework-ioc-source-71](笔记.assets\spring-framework-ioc-source-71.png)
 
 ### 初始化流程
 
+>Spring实现将资源配置通过加载、解析、生成BeanDefinition注册到IoC容器的过程
 
+简单来说，总的流程是：
 
-### Bean实例化
+1. 调用父类构造方法为容器设置好Bean资源加载器：
+
+   1. 调用默认构造函数初始化容器id，name，状态以及资源解析器
+   2. 调用setParent方法将父容器的Environment合并到当前容器
+
+2. 设置配置路径进行Bean定义资源文件定位
+
+   1. 调用setConfigLocations方法从Environment中解析Bean配置文件路径
+
+3. 初始化容器，调用模板方法refresh（该模板提供钩子方法）
+
+   1. 创建IoC容器前，如果有容器存在，需要将已有容器销毁和关闭
+   2. 建立新的Ioc容器
+
+   作用相当于对IoC容器进行重启
+
+>这里补充一下关于模板方法模式的一些知识
+>
+>模板方法是一个算法骨架，是一系列调用的基本方法，而基本方法可以分为：
+>
+>1. 抽象方法：声明但未实现
+>2. 具体方法：实现，可以重写或继承
+>3. 钩子方法：实现，分为用于判断的逻辑方法，和需要子类重写的空方法两种
+>
+>在IoC容器初始化过程中用到的钩子方法有
+>
+>1. prepareRefresh：对应BeanFactory、MessageSource、ApplicationEvent的初始化
+>2. onRefresh：初始化完成后注册监听器
+>3. finishRefresh：完成重新初始化
+>4. cancelRefresh：销毁已初始化（这个方法是前序方法出错调用的
+
+### Bean实例化	
+
