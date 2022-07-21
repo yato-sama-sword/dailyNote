@@ -2,7 +2,7 @@
 
 > 其实组件不止下述这些，个人编写简易Spring以及简易SpringMvc项目中略过了一些非必要但也很重要的模块。想快速了解可以看看[Spring FrameWork 5](https://pdai.tech/md/spring/spring-x-framework-introduce.html)专栏，鱼皮大大写的。想深入了解的话推荐看陈雄华老师在电子工业出版社出版的Spring有关书籍，讲的很细，日后希望可以详读。
 
-### Core Container（Spring核心容器）
+## Core Container（Spring核心容器）
 
 > 实现其他模块的基础，由Beans模块、Core核心模块、Context上下文模块和SpEL表达式语言模块组成。想在项目中实现AOP等功能必须仰赖于该模块。下面介绍一下SpEL模块外的三个模块
 
@@ -10,7 +10,7 @@
 - **Core 核心模块**：封装了 Spring 框架的底层部分，包括资源访问、类型转换及一些常用工具类。
 - **Context 上下文模块**：建立在 Core 和 Beans 模块的基础之上，集成 Beans 模块功能并添加资源绑定、数据验证、国际化、Java EE 支持、容器生命周期、事件传播等。ApplicationContext 接口是上下文模块的焦点。
 
-### Aspects
+## Aspects
 
 > 提供与 AspectJ 的集成，是一个功能强大且成熟的面向切面编程（AOP）框架。（和Spring AOP实现上没有关系，只是Spring可以集成AspectJ，使用相关方法）
 
@@ -205,22 +205,6 @@ public class ServiceImpl {
 
 **流程大致如下：**
 
-1. 从配置文件获取BeanDefinition
-
-2. BeanFactoryPostProcessor修改BeanDefinition
-
-3. bean实例化
-
-4. BeanPostProcessor进行前置处理
-
-5. bean初始化
-
-6. BeanPostProcessor进行后置处理
-
-7. 使用
-
-8. 销毁
-
 **BeanFactoryProcessor&BeanPostProcessor**
 
 1. BeanFactoryPostProcessor：spring提供的容器扩展机制，允许我们在bean实例化之前修改bean的定义信息即BeanDefinition的信息。其重要的实现类有PropertyPlaceholderConfigurer和CustomEditorConfigurer，PropertyPlaceholderConfigurer的作用是用properties文件的配置值替换xml文件中的占位符，CustomEditorConfigurer的作用是实现类型转换
@@ -236,7 +220,3 @@ public class ServiceImpl {
 JDK的动态代理的缺点是只能对接口作代理，其原理是反射。
 
 而Cglib则可以对任何类进行代理，其原理是字节码增强，更灵活更高效，但是会更复杂。（不过Spring屏蔽了复杂性，只是原理复杂
-
-# 设计模式
-
-# 

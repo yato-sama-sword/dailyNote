@@ -8,7 +8,11 @@
 
 # [Java语言相关知识](Java语言相关.md)
 
-> 内含JavaIo、JVM、Java多线程相关知识
+> 内含Java的Io、JVM、Java多线程相关知识
+
+# [设计模式](设计模式.md)
+
+> 内含常见的设计模式介绍
 
 # [计算机基础](计算机基础.md)
 
@@ -42,6 +46,6 @@
 
 > 该项目详情参见[simple-spring项目代码](https://github.com/yato-sama-sword/simple-spring.git)
 
-[东软睿购项目笔记](东软睿购项目笔记.md)
+[睿购项目笔记](睿购项目笔记.md)
 
 > 该项目是东软实训的商城项目，学习参考了leyou商城
