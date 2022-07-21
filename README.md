@@ -42,7 +42,7 @@
 
 > 这里记录的是一些我的项目相关的知识
 
-[simple-spring项目知识](simple-spring.md)
+[simple-spring项目知识](simple-spring项目笔记.md)
 
 > 该项目详情参见[simple-spring项目代码](https://github.com/yato-sama-sword/simple-spring.git)
 
