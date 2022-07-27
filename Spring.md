@@ -87,11 +87,24 @@
 - `@Service` : 对应服务层，主要涉及一些复杂的逻辑，需要用到 Dao 层。
 - `@Controller` : 对应 Spring MVC 控制层，主要用户接受用户请求并调用 Service 层返回数据给前端页面。
 
-#### bean的生命周期：
+#### 初始化方法(instantiatiing Beans)
 
-总的来说：分为实例化、属性设置、初始化、销毁四个阶段。具体如下图所示：
+1. 默认无参的构造器实例化：调用的时候通过无参构造方法进行Bean初始化(类实例化，对象的实例化需要等属性获取对应值)
+2. 静态/实例工厂方法实例化：工厂方法中会在工厂初始化的时候就初始化Bean，静态/实例的区别在于获取初始化后Bean的方法是否是静态化的
 
-![img](file://C:\Users\yato\Desktop\U know wt\面试准备\dailyNote\笔记.assets\Bean生命周期-16519280909622.png?msec=1657797481022)
+#### bean的生命周期
+
+总的来说：从Bean创建到销毁的过程可以分为：Bean定义、实例化、属性赋值、初始化、生存期、销毁
+
+以注解类(普通的Java类)变成Spring Bean为例，Spring会扫描**指定包**下面的Java类，然后根据Java类构建beanDefinition对象，然后再根据beanDefinition来创建Spring的bean
+
+> beanDefinitoin
+
+beanDefinition存储bean的元信息，如lazyinit懒加载、scope表示bean作用域、beanClass存储bean的Class信息、properyValues存储bean的属性等等。这里提一嘴autowireMode注入模型属性，像@Autowired这个注解，表示优先使用类型匹配注入；@Resourece注解则优先考虑名称匹配
+
+![Bean生命周期](file://C:\Users\yato\Desktop\U know wt\面试准备\dailyNote\笔记.assets\Bean生命周期详.png)
+
+
 
 ### 事务
 
@@ -122,15 +135,15 @@
 
 1. **`TransactionDefinition.PROPAGATION_REQUIRED`**
    
-   ​ 使用的最多的一个事务传播行为，我们平时经常使用的`@Transactional`注解默认使用就是这个事务传播行为。如果当前存在事务，则加入该事务；如果当前没有事务，则创建一个新的事务
+    使用的最多的一个事务传播行为，我们平时经常使用的`@Transactional`注解默认使用就是这个事务传播行为。如果当前存在事务，则加入该事务；如果当前没有事务，则创建一个新的事务
 
 2. **`TransactionDefinition.PROPAGATION_REQUIRES_NEW`**
    
-   ​ 创建一个新的事务，如果当前存在事务，则把当前事务挂起。也就是说不管外部方法是否开启事务，`Propagation.REQUIRES_NEW`修饰的内部方法会新开启自己的事务，且开启的事务相互独立，互不干扰。
+    创建一个新的事务，如果当前存在事务，则把当前事务挂起。也就是说不管外部方法是否开启事务，`Propagation.REQUIRES_NEW`修饰的内部方法会新开启自己的事务，且开启的事务相互独立，互不干扰。
 
 3. **`TransactionDefinition.PROPAGATION_NESTED`**
    
-   ​ 如果当前存在事务，则创建一个事务作为当前事务的嵌套事务来运行；如果当前没有事务，则该取值等价于`TransactionDefinition.PROPAGATION_REQUIRED`。
+    如果当前存在事务，则创建一个事务作为当前事务的嵌套事务来运行；如果当前没有事务，则该取值等价于`TransactionDefinition.PROPAGATION_REQUIRED`。
 
 4. **`TransactionDefinition.PROPAGATION_MANDATORY`**
    

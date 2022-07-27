@@ -103,6 +103,8 @@ public class ServiceImpl {
 
 ### 初始化流程
 
+Spring IoC容器载入定义资源从refresh()函数开始
+
 > Spring实现将资源配置通过加载、解析、生成BeanDefinition注册到IoC容器（**本质上是存放BeanDefinition的ConcurrentHashMap<String,Object>**）的过程
 
 **从源码上看，具体实现为**
@@ -205,6 +207,8 @@ public class ServiceImpl {
 
 **流程大致如下：**
 
+![Bean生命周期](C:\Users\yato\Desktop\U know wt\面试准备\dailyNote\笔记.assets\Bean生命周期.png)
+
 **BeanFactoryProcessor&BeanPostProcessor**
 
 1. BeanFactoryPostProcessor：spring提供的容器扩展机制，允许我们在bean实例化之前修改bean的定义信息即BeanDefinition的信息。其重要的实现类有PropertyPlaceholderConfigurer和CustomEditorConfigurer，PropertyPlaceholderConfigurer的作用是用properties文件的配置值替换xml文件中的占位符，CustomEditorConfigurer的作用是实现类型转换
@@ -220,3 +224,246 @@ public class ServiceImpl {
 JDK的动态代理的缺点是只能对接口作代理，其原理是反射。
 
 而Cglib则可以对任何类进行代理，其原理是字节码增强，更灵活更高效，但是会更复杂。（不过Spring屏蔽了复杂性，只是原理复杂
+
+# 实现思路
+
+## 1.实现简易的Bean容器
+
+> Spring包含并管理应用对象的配置和生命周期，Bean通过零件化拆分存放至BeanDefinitoin的方式，让Spring更加容易管理Bean对象，并可以统一进行装配(包括Bean初始化、属性填充等)
+
+**如何实现一个Spring容器**(BeanFactory)
+
+简单的方法就是用Map，可以用HashMap也可以用ConcurrentHashMap。项目中采用HashMap，实质上就是存储Bean名称和BeanDefinition的映射
+
+## 2.实现Bean的定义、注册、获取
+
+定义：BeanDefinition，存储Bean类信息
+
+注册：将定义存储在容器中
+
+获取：通过单例模式获取Bean的实例(需要判断bean是否在缓存中，并根据相关情况进行实例化操作)
+
+**模板模式**：
+
+Bean工厂提供Bean获取方法，并由AbstratBeanFactory抽象类进行实现。统一接口的通用核心方法的调用逻辑和标准定义！类的继承者只需要关心具体方法的逻辑实现
+
+## 3.提供对象实例化策略
+
+如果是对于没有属性的bean来说(大部分常见bean都是无参的)，通过beanClass.newInstance就已经完成任务了，但是对于有属性的bean而言，实例化分成两种流派，各有千秋
+
+1. 无参构造：不用获取Constructor，直接创建实例，对于jdk而言是newInstance，对于cglib而言是enhancer.create
+2. 有参构造：需要获取对应的Constructor，通过对应的构造器来进行实例化
+
+#### 构造函数
+
+需要获取bean的Constructor，并与实例化所给的参数进行匹配，在Spring中会检查参数的类型和个数是否都匹配，但是为了简单项目中只会检查参数的个数是否匹配
+
+#### NoOp vs MethodInterceptor
+
+> 一开始用MethodInterceptor作为enhancer的callback一直报错，用了NoOp才解决，稍微探究一番
+
+callback可以认为是cglib生成字节码的实现手段，一共可以分为6种
+
+1. MethodInterceptor：类似于环绕增强
+2. FixedValue：替换源方法的返回值
+3. InvocationHandler：用于自定义实现，类似于MethodInterceptor
+4. LazyLoader：单例类的延迟生成代理
+5. Dispatcher：原型类的延迟生成代理
+6. NoOp：啥也不干
+
+实现MethodInterceptor接口时，需要实现intercept方法，参数为对象、方法、方法参数、方法代理
+
+## 4.属性填充、依赖注入
+
+> 这里的属性更偏向于成员变量的意思，实质上属性的官方定义是指get或set方法去掉get或set后剩下字母。比如 getSize 即有属性size
+
+**实现**：在BeanDefinition中添加属性相关内容，以List+Map形式存储bean类的成员变量名称和类型。进行属性填充即通过BeanDefinitoin中的属性信息与bean类的属性信息进行匹配，将BeanDefinition存储的属性填充进bean实例中
+
+**注意事项**：进行属性填充时需要注意该属性是否为对象类型，单独对对象的依赖进行管理。在注入对象依赖时，需要先对注入的对象进行实例化
+
+## 5.资源加载器解析文件注册对象
+
+> 一般来说Spring有配置文件就可以实例化bean，不用手动创建。所以我们需要一个资源解析器，可以读取classpath、本地文件、云文件中的配置内容(xml)，并且可以对配置文件进行解析，将Bean对象注册到Spring容器中
+
+**实现**：首先是定义资源和资源解析器。具体来说实现有classpath资源、文件系统资源和Url资源，资源解析器的默认实现负责读取这三种资源。随后实现对xml文件的解析，主要是根据读取标签相关值，根据标签名进行相应处理，生成bean元信息(beanDefinition)
+
+### org.w3c.dom
+
+org.w3c.dom为DOM(文档对象模型)提供接口
+
+Document(文档树模型)则可以表示整个HTML或XML文档
+
+Node是DOM中的基本对象，代表文档树的抽象节点(标签啦)
+
+Element是Node类最主要的子对象，可以存取属性
+
+### CharSequence
+
+> 使用hutool的StrUtil建议使用CharSequenceUtil，有啥不一样呢？
+
+CharSequence是一个接口，表示有序的字符集合，提供一些基本的操作方法
+
+String、StringBuilder、StringBuffer都实现该接口
+
+**较之于String**：可读可写；泛用性更强
+
+## 6.应用上下文：超级BeanFactory
+
+> ApplicationContext：把相应的XML加载、注册、实例化以及新增的修改和扩展都直接实现
+>
+> 方便、快捷，是Spring的对外接口
+
+**refresh方法**:
+
+1. 加载：创建BeanFactory，从Xml文件加载BeanDefinition，获取BeanFactory
+2. 修改：Bean实例化前，可以进行BeanDefintion的修改
+3. 注册：BeanPostProcessor提前于其他对象实例化之前执行注册操作
+4. 实例化：Bean对象(BeanPostProcessor)
+	1. 前置处理
+	2. CreateBean
+	3. 后置处理
+
+**BeanFactoryPostProcessor**：
+
+实现在所有BeanDefinition加载完成后，实例化Bean对象之前，提供修改BeanDefinition属性的机制
+
+**BeanPostProcessor**：
+
+修改实例化Bean对象的扩展点，可以在Bean对象执行初始化方法前后执行相关方法
+
+## 7.初始化和销毁方法
+
+> Spring中bean可以读取在xml文件中自定义的初始化和销毁方法名，调用实现接口的对应方法
+
+**InitalizingBean、DisposableBean**：
+
+定义初始化方法和销毁方法的接口，想实现初始化和销毁方法的bean可以实现这两个接口
+
+当然，并不是所有的初始化和销毁方法都需要自己定义去实现，肯定是需要进行一些初步的具体实现的。DisposableBean的初步实现就由DisposableBeanAdapter适配器完成，这里涉及到了适配器模式，让方法有了更多的延展性
+
+### 8.Aware感知容器对象
+
+> 要获得Spring框架提供的BeanFactory、ApplicationContext、BeanClassLoader等等进行框架扩展使用时，涉及到对容器操作的感知
+
+#### Aware
+
+> 感知标记性接口，具体子类定义和实现可以感知容器中相关对象
+
+实现有：BeanFactoryAware等等
+
+
+
+# 心得体会
+
+## 设计模式
+
+### 模板方法
+
+> 模板方法会定义一个算法的骨架，将一些步骤延迟到子类去实现。使得在子类不改变算法结构的基础上，可以重新定义算法中的某些步骤
+
+#### 使用
+
+使用该设计模式的类中，一般有如下几种方法
+
+1. 抽象方法：抽象类声明，由具体子类实现，并以abstract关键字进行标识
+2. 具体方法：抽象类声明并实现，子类不Override
+3. 钩子方法：抽象类声明并实现，子类可以Override。通常抽象类会给出没有具体实现的空方法
+4. 模板方法：定义算法逻辑骨架的方法
+
+在代码实现中，refresh方法就是一个典型的模板方法
+
+```java
+public void refresh() throws BeansException {
+    // 1.创建BeanFactory，并加载BeanDefinition
+    refreshBeanFactory();
+    // 2.获取BeanFactory
+    ConfigurableListableBeanFactory beanFactory = getBeanFactory();
+    // 3.Bean实例化之前，执行BeanFactoryPostProcessor
+    invokeBeanFactoryPostProcessors(beanFactory);
+    // 4.BeanPostProcessor 需要提前与其他Bean对象实例化之前进行注册操作
+    registerBeanPostProcessors(beanFactory);
+    // 5.提前实例化单例对象
+    beanFactory.preInstantiateSingletons();
+}
+```
+
+refreshBeanFactory和getBeanFactory是抽象方法
+
+```java
+protected abstract void refreshBeanFactory() throws BeansException;
+
+protected abstract ConfigurableListableBeanFactory getBeanFactory();
+```
+
+invokeBeanFactoryPostProcessors和registerBeanPostProcessors是具体方法
+
+#### 优点/应用场景
+
+个人认为使用该设计模式可以在以达成某一特定目标为前提时，可以在一个整体的框架之下，有不同具体的实现方式。不仅
+
+### 简单工厂/工厂模式
+
+### 代理模式
+
+> 代理模式是
+
+### 单例模式
+
+> 单例模式是
+
+### 适配器模式
+
+> 适配器模式指的是
+
+#### 使用
+
+销毁方法多种，是AbstractApplicationContext注册虚拟机之后，虚拟机关闭之前执行的动作。在销毁方法执行时不关注底层的具体实现，通过统一接口进行销毁，于是使用适配器`DisposableBeanAdaptor`，实现统一的处理
+
+## 相关技术
+
+### Hook
+
+> 一种消息拦截机制，并能够对拦截信息进行自动处理
+>
+> 1. 线程钩子：可以拦截单个进程的消息
+> 2. 系统钩子：能够拦截全部进程的消息
+
+使用方法(使用场景在方法备注中)
+
+```java
+// 1.程序正常退出，最新的非守护线程退出或该退出方法被唤醒
+// 2.JVM被中断
+Runtime.getRuntime().addShutdownHook(Thread）；
+```
+
+测试一下Hook在Java中的使用！
+
+```java
+@Slf4j
+public class HookTest {
+    private void selfIntroduction() {
+        log.info(this.getClass().getSimpleName());
+    }
+    @Test
+    public void testHook() {
+        // 程序退出时候调用selfIntroduction
+        Runtime.getRuntime().addShutdownHook(new Thread(this::selfIntroduction));
+        log.info("do nothing");
+    }
+}
+```
+
+```txt
+15:49:15.394 [main] INFO edu.neu.spring.test.HookTest - do nothing
+15:49:15.394 [Thread-0] INFO edu.neu.spring.test.HookTest - HookTest
+```
+
+### HuTool
+
+
+
+# 参考资料
+
+1. 《手撸Spring》-小傅哥
+2. https://github.com/code4craft/tiny-spring
+3. https://github.com/DerekYRC/mini-spring
